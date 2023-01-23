@@ -1,3 +1,5 @@
+# React Notes
+
 - [Intro](#intro)
 - [Setup](#setup)
   - [npm vs yarn](#npm-vs-yarn)
@@ -62,7 +64,7 @@ npm install --save typescript @types/node @types/react @types/react-dom @types/j
 
 change `.js` or `jsx` files to `.tsx` files
 
-```json
+```ts
 // tsconfig.json
 {
   "compilerOptions": {
@@ -399,22 +401,67 @@ Pure Function: same input, same output
 Side Effect: 指一个函数处理了与返回值无关的事情，如修改了全局变量、修改了传入的参数、使用了 Ajax 进行 API 调用、修改了 DOM 元素、console.log
 
 ```ts
-useEffect(() => {
-  document.title = `click ${count} times`;
-}, [count]);
+import React, { useState, useEffect } from "react";
+
+const App: React.FC = (props) => {
+  const [count, setCount] = useState<number>(0);
+  const [robotGallery, setRobotGallery] = useState<any>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  // show loading state
+  const [error, setError] = useState<string>();
+  
+  useEffect(() => {
+    fetch("https://jsonplaceholder.typicode.com/users")
+    .then(response => response.json())
+    .then(data => setRobotGallery(data)
+  }, [])
+  
+  return ()
+}
 ```
 
-useContext: handle cross-component data transmit
+async & await
 
-useReducer: manage global state
+```
+// 想要调用 await 关键词，函数本身要是一个 promise
+useEffect(() => {
+  const fetchData = async () => {
+    setLoading(true);
+    // handle error
+    try {
+      const responses = await fetch(
+        "https://jsonplaceholder.typicode.com/users"
+      );
+      const data = await responses.data;
+      setRobotGallery(data);
+      setLoading(false);
+    } catch(e) {
+      if (e instanceof Error) {
+        setError(e.message);
+      }
+    };
+  };
+  fetchData();
+}, [])
 
-useCallback: handle side effect of callback
+{(error || error !== "") && <div>error: {error}</div>}
+```
 
-useRef: return a reference, remain unchanged during whole lifecycle
+使用空数组 `[]` 相当于模拟类组件的生命周期函数 componentDidMount，Effect 仅会在第一次挂载 UI 的时候起作用
 
-useLayoutEffect: 在所有DOM变更之后同步调用，读取DOM布局并同步出发重新渲染
+不使用第二个参数，相当于模拟生命周期 `componentDidUpdate`
 
-useDebugValue: 在React开发者工具中显示自定义的hook标签
+### useContext: handle cross-component data transmit
+
+### useReducer: manage global state
+
+### useCallback: handle side effect of callback
+
+### useRef: return a reference, remain unchanged during whole lifecycle
+
+### useLayoutEffect: 在所有DOM变更之后同步调用，读取DOM布局并同步出发重新渲染
+
+### useDebugValue: 在React开发者工具中显示自定义的hook标签
 
 
 ## Others
@@ -424,5 +471,9 @@ footnotes <sup><a href="#note1">[1]</a></sup>
 <a name="note1"></a> [how-to-add-footnotes-to-github-flavoured-markdown](http://stackoverflow.com/questions/25579868/how-to-add-footnotes-to-github-flavoured-markdown)
 
 ## Pending
+
+fetch status data
+
+promise
 
 git rollback
