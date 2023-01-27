@@ -1,5 +1,6 @@
-# React Notes
+## React Notes
 
+- [React Notes](#react-notes)
 - [Intro](#intro)
 - [Setup](#setup)
   - [npm vs yarn](#npm-vs-yarn)
@@ -15,9 +16,15 @@
 - [React Hooks](#react-hooks)
   - [useState](#usestate)
   - [useEffect](#useeffect)
+  - [useContext](#usecontext)
+  - [useReducer: manage global state](#usereducer-manage-global-state)
+  - [useCallback: handle side effect of callback](#usecallback-handle-side-effect-of-callback)
+  - [useRef: return a reference, remain unchanged during whole lifecycle](#useref-return-a-reference-remain-unchanged-during-whole-lifecycle)
+  - [useLayoutEffect: 在所有DOM变更之后同步调用，读取DOM布局并同步出发重新渲染](#uselayouteffect-在所有dom变更之后同步调用读取dom布局并同步出发重新渲染)
+  - [useDebugValue: 在React开发者工具中显示自定义的hook标签](#usedebugvalue-在react开发者工具中显示自定义的hook标签)
+- [Higher-Order Component](#higher-order-component)
 - [Others](#others)
 - [Pending](#pending)
-
 
 ## Intro
 
@@ -403,7 +410,11 @@ Side Effect: 指一个函数处理了与返回值无关的事情，如修改了�
 ```ts
 import React, { useState, useEffect } from "react";
 
-const App: React.FC = (props) => {
+interface Props {
+  username: string
+}
+
+const App: React.FC<Props> = (props) => {
   const [count, setCount] = useState<number>(0);
   const [robotGallery, setRobotGallery] = useState<any>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -416,13 +427,18 @@ const App: React.FC = (props) => {
     .then(data => setRobotGallery(data)
   }, [])
   
-  return ()
+  return (
+    <div className={styles.app}>
+      <h2>{props.username}</h2>
+      <Child username={props.username} />
+    </div>
+  )
 }
 ```
 
 async & await
 
-```
+```ts
 // 想要调用 await 关键词，函数本身要是一个 promise
 useEffect(() => {
   const fetchData = async () => {
@@ -443,7 +459,7 @@ useEffect(() => {
   };
   fetchData();
 }, [])
-
+// condition
 {(error || error !== "") && <div>error: {error}</div>}
 ```
 
@@ -451,7 +467,82 @@ useEffect(() => {
 
 不使用第二个参数，相当于模拟生命周期 `componentDidUpdate`
 
-### useContext: handle cross-component data transmit
+### useContext
+
+handle cross-component data transmit: 允许组件之间共享数据，而不是通过 prop drilling 的方式
+
+useContext 减少了模板代码，减少了代码的层级，消灭了多个consumer互相嵌套的可能系
+
+```ts
+// index.tsx
+import React from "react";
+import ReactDOM from "react-dom";
+import "./index.css";
+import App from "./App";
+import reportWebVitals from "./reportWebVitals";
+
+const defaultContextValue = {
+  username: "James",
+};
+
+// notice export
+export const appContext = React.createContext(defaultContextValue);
+
+ReactDOM.render(
+  <React.StrictMode>
+    <appContext.Provider value={defaultContextValue}>
+      <App />
+    </appContext.Provider>
+  </React.StrictMode>
+)
+```
+
+```ts
+// components/Robot.tsx
+import React, { useContext } from "react";
+import { appContext } from "../index.tsx";
+
+interface RobotProps {
+  id: number;
+  name: string;
+  email: string;
+}
+const Robot: React.FC<RobotProps> = ({id, name, email}) => {
+  const value = useContext(appContext)
+  return (
+   <div>
+     <p>Author: {value.username}</p>
+   </div>
+  )
+}
+```
+
+组件化 Context Provider
+
+```ts
+import React, { PropsWithChildren, useState } from "react";
+
+interface AppStateValue {
+    username: string;
+    shoppingCart: { items: {id: number, name: string}[] }
+}
+
+const defaultContextValue: AppStateValue = {
+    username: "James",
+    shoppingCart: { items: [] }
+}
+
+export const appContext = React.createContext(defaultContextValue);
+
+export const AppStateProvider: React.FC<PropsWithChildren<{}>> = (props) => {
+    const [state, setState] = useState(defaultContextValue);
+    return (
+        <appContext.Provider value={state}>
+            {props.children}
+        </appContext.Provider>
+    )
+}
+```
 
 ### useReducer: manage global state
 
@@ -463,6 +554,89 @@ useEffect(() => {
 
 ### useDebugValue: 在React开发者工具中显示自定义的hook标签
 
+## Higher-Order Component
+
+`const EnhancedComponent = higherOrderComponent(WarappedComponent);`
+
+`withXXX()`
+
+1. 抽取重复代码，实现组件复用
+2. 条件渲染，控制组件的渲染逻辑
+3. 捕获/劫持被处理组件的生命周期
+
+```ts
+// AddToCart.tsx
+import React from "react";
+import { addStateContext } from "../AppState";
+import { RobotProps } from "./Robot";
+
+export const withAddToCart = (ChildComponent: React.ComponentType<RobotProps>) => {
+  // React.ComponentType<P> is an alias for React.FunctionComponent<P> | React.ClassComponent<P>
+  // return class extends React.Component {}
+  return (props) => {
+    const setState = useContext(appSetStateContext)
+    const addToCart = (id, name) => {
+      if (setState) {
+        setState((state) => {
+          return {
+            ...state,
+            shoppingCart: {
+              items: [...state.shoppingCart.items, { id, name }],
+            },
+          };
+        });
+      }
+    }
+    return <ChildComponent {...props} addToCart={addToCart}/>
+  }
+}
+```
+
+```ts
+// Robot.tsx
+import React, { useContext } from "react";
+import styles from "./Robot.module.css";
+import { appContext, appSetStateContext } from "../AppState";
+import { withAddToCart } from "./AddToCart";
+
+export interface RobotProps {
+  id: number;
+  name: string;
+  email: string;
+  addToCart: (id, name) => void;
+}
+
+const Robot: React.FC<RobotProps> = ({ id, name, email, addToCart }) => {
+  const value = useContext(appContext);
+  return (
+    <div classname={styles.cardContainer}>
+      <button onClick={() => addToCart(id, name)}>Add to Cart</button>
+    </div>
+  );
+}
+export default withAddToCart(Robot);
+```
+
+Customized Hook
+
+```ts
+export const useAddToCart = () => {
+  const setState = useContext(appSetStateContext)
+  const addToCart = (id, name) => {
+    if (setState) {
+     setState((state) => {
+       return {
+         ...state,
+         shoppingCart: {
+           items: [...state.shoppingCart.items, { id, name }],
+         },
+       };
+     });
+   }
+  }
+  return addToCart;
+}
+```
 
 ## Others
 
